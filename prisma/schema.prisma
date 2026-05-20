@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  name               String?
+  image              String?
+  googleAccessToken  String?
+  googleRefreshToken String?
+  googleTokenExpiry  DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  notes              Note[]
+  scheduledPlans     ScheduledPlan[]
+  accounts           Account[]
+  sessions           Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  color       String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+
+  @@index([userId, position])
+}
+
+model Task {
+  id             String          @id @default(cuid())
+  noteId         String
+  note           Note            @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  name           String
+  importance     ImportanceLevel
+  durationMins   Int
+  timeWindows    Json?
+  repeatRule     RepeatRule      @default(NONE)
+  completed      Boolean         @default(false)
+  position       Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  scheduledSlots ScheduledSlot[]
+
+  @@index([noteId])
+}
+
+enum ImportanceLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RepeatRule {
+  NONE
+  DAILY
+  WEEKLY
+}
+
+model ScheduledPlan {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart   DateTime
+  generatedAt DateTime        @default(now())
+  slots       ScheduledSlot[]
+
+  @@unique([userId, weekStart])
+  @@index([userId, weekStart])
+}
+
+model ScheduledSlot {
+  id            String        @id @default(cuid())
+  planId        String
+  plan          ScheduledPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  taskId        String
+  task          Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  startTime     DateTime
+  endTime       DateTime
+  manuallyMoved Boolean       @default(false)
+  skipped       Boolean       @default(false)
+  skipReason    String?
+
+  @@index([planId])
+  @@index([taskId])
+}
