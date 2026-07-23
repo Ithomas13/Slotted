@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getValidAccessToken } from "@/lib/auth/refreshToken";
 import { fetchCalendarEvents } from "@/lib/calendar/fetchEvents";
-import { computeFreeSlots } from "@/lib/calendar/computeFreeSlots";
+import {
+  computeFreeSlots,
+  subtractBusyIntervalsFromFreeSlots,
+} from "@/lib/calendar/computeFreeSlots";
 import { callSchedulingAI } from "./callAI";
-import { startOfDay, addDays } from "date-fns";
+import { addDays } from "date-fns";
 import type { Task } from "@/types/index";
 
 export async function generateSchedule(userId: string, weekStart: Date): Promise<void> {
@@ -45,15 +48,33 @@ export async function generateSchedule(userId: string, weekStart: Date): Promise
 
   const existingPlan = await prisma.scheduledPlan.findUnique({
     where: { userId_weekStart: { userId, weekStart } },
-    include: { slots: { where: { manuallyMoved: true } } },
+    include: { slots: { where: { manuallyMoved: true, skipped: false } } },
   });
 
+  const manuallyMovedSlots = existingPlan?.slots ?? [];
   const manuallyMovedTaskIds = new Set(
-    existingPlan?.slots.map((s) => s.taskId) ?? []
+    manuallyMovedSlots.map((s) => s.taskId)
   );
 
   const tasksToSchedule = tasks.filter((t) => !manuallyMovedTaskIds.has(t.id));
-  const aiOutput = await callSchedulingAI(tasksToSchedule, freeSlots);
+  const freeSlotsAfterManualMoves = subtractBusyIntervalsFromFreeSlots(
+    freeSlots,
+    manuallyMovedSlots.map((slot) => ({
+      start: slot.startTime,
+      end: slot.endTime,
+    }))
+  );
+
+  if (tasksToSchedule.length === 0) {
+    await prisma.scheduledPlan.upsert({
+      where: { userId_weekStart: { userId, weekStart } },
+      update: { generatedAt: new Date(), slots: { deleteMany: { manuallyMoved: false } } },
+      create: { userId, weekStart },
+    });
+    return;
+  }
+
+  const aiOutput = await callSchedulingAI(tasksToSchedule, freeSlotsAfterManualMoves);
 
   await prisma.$transaction(async (tx) => {
     const plan = await tx.scheduledPlan.upsert({

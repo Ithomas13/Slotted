@@ -9,6 +9,26 @@ interface Interval {
   end: Date;
 }
 
+export interface BusyIntervalInput {
+  start: Date | string;
+  end: Date | string;
+}
+
+function durationMins(start: Date, end: Date): number {
+  return (end.getTime() - start.getTime()) / 60000;
+}
+
+function toInterval(input: BusyIntervalInput): Interval | null {
+  const start = input.start instanceof Date ? input.start : new Date(input.start);
+  const end = input.end instanceof Date ? input.end : new Date(input.end);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    return null;
+  }
+
+  return { start, end };
+}
+
 function addSleepBlocks(rangeStart: Date, rangeEnd: Date): Interval[] {
   const blocks: Interval[] = [];
   // Start one day before to capture the sleep block that extends into rangeStart morning
@@ -90,9 +110,9 @@ export function computeFreeSlots(
     if (cursor < block.start) {
       const gapStart = new Date(Math.max(cursor.getTime(), clampedStart.getTime()));
       const gapEnd = new Date(Math.min(block.start.getTime(), clampedEnd.getTime()));
-      const durationMins = (gapEnd.getTime() - gapStart.getTime()) / 60000;
-      if (durationMins >= MIN_SLOT_MINS) {
-        freeSlots.push({ start: gapStart.toISOString(), end: gapEnd.toISOString(), durationMins });
+      const gapDurationMins = durationMins(gapStart, gapEnd);
+      if (gapDurationMins >= MIN_SLOT_MINS) {
+        freeSlots.push({ start: gapStart.toISOString(), end: gapEnd.toISOString(), durationMins: gapDurationMins });
       }
     }
 
@@ -100,11 +120,67 @@ export function computeFreeSlots(
   }
 
   if (cursor < clampedEnd) {
-    const durationMins = (clampedEnd.getTime() - cursor.getTime()) / 60000;
-    if (durationMins >= MIN_SLOT_MINS) {
-      freeSlots.push({ start: cursor.toISOString(), end: clampedEnd.toISOString(), durationMins });
+    const gapDurationMins = durationMins(cursor, clampedEnd);
+    if (gapDurationMins >= MIN_SLOT_MINS) {
+      freeSlots.push({ start: cursor.toISOString(), end: clampedEnd.toISOString(), durationMins: gapDurationMins });
     }
   }
 
   return freeSlots;
+}
+
+export function subtractBusyIntervalsFromFreeSlots(
+  freeSlots: FreeSlot[],
+  busyIntervals: BusyIntervalInput[]
+): FreeSlot[] {
+  const busy = mergeIntervals(
+    busyIntervals
+      .map(toInterval)
+      .filter((interval): interval is Interval => interval !== null)
+  );
+
+  if (busy.length === 0) return freeSlots;
+
+  const available: FreeSlot[] = [];
+
+  for (const slot of freeSlots) {
+    const slotStart = new Date(slot.start);
+    const slotEnd = new Date(slot.end);
+    if (Number.isNaN(slotStart.getTime()) || Number.isNaN(slotEnd.getTime()) || slotEnd <= slotStart) {
+      continue;
+    }
+
+    let cursor = slotStart;
+
+    for (const block of busy) {
+      if (block.end <= cursor) continue;
+      if (block.start >= slotEnd) break;
+
+      const gapEnd = new Date(Math.min(block.start.getTime(), slotEnd.getTime()));
+      const gapDurationMins = durationMins(cursor, gapEnd);
+      if (gapDurationMins >= MIN_SLOT_MINS) {
+        available.push({
+          start: cursor.toISOString(),
+          end: gapEnd.toISOString(),
+          durationMins: gapDurationMins,
+        });
+      }
+
+      cursor = new Date(Math.max(cursor.getTime(), block.end.getTime()));
+      if (cursor >= slotEnd) break;
+    }
+
+    if (cursor < slotEnd) {
+      const gapDurationMins = durationMins(cursor, slotEnd);
+      if (gapDurationMins >= MIN_SLOT_MINS) {
+        available.push({
+          start: cursor.toISOString(),
+          end: slotEnd.toISOString(),
+          durationMins: gapDurationMins,
+        });
+      }
+    }
+  }
+
+  return available;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeFreeSlots } from "./computeFreeSlots";
+import { computeFreeSlots, subtractBusyIntervalsFromFreeSlots } from "./computeFreeSlots";
 import type { CalendarEvent } from "@/types/calendar";
 
 const day = (d: number, h: number, m = 0) =>
@@ -77,5 +77,38 @@ describe("computeFreeSlots", () => {
       const computed = (new Date(s.end).getTime() - new Date(s.start).getTime()) / 60000;
       expect(s.durationMins).toBeCloseTo(computed, 0);
     });
+  });
+
+  it("subtracts preserved manual slots from free slots", () => {
+    const slots = subtractBusyIntervalsFromFreeSlots(
+      [{ start: day(6, 9), end: day(6, 12), durationMins: 180 }],
+      [{ start: day(6, 10), end: day(6, 11) }]
+    );
+
+    expect(slots).toEqual([
+      { start: day(6, 9), end: day(6, 10), durationMins: 60 },
+      { start: day(6, 11), end: day(6, 12), durationMins: 60 },
+    ]);
+  });
+
+  it("filters fragments shorter than 15 minutes when subtracting busy slots", () => {
+    const slots = subtractBusyIntervalsFromFreeSlots(
+      [{ start: day(6, 9), end: day(6, 10), durationMins: 60 }],
+      [{ start: day(6, 9, 10), end: day(6, 9, 45) }]
+    );
+
+    expect(slots).toEqual([
+      { start: day(6, 9, 45), end: day(6, 10), durationMins: 15 },
+    ]);
+  });
+
+  it("ignores busy intervals outside the free slot range", () => {
+    const freeSlot = { start: day(6, 9), end: day(6, 10), durationMins: 60 };
+    const slots = subtractBusyIntervalsFromFreeSlots(
+      [freeSlot],
+      [{ start: day(6, 12), end: day(6, 13) }]
+    );
+
+    expect(slots).toEqual([freeSlot]);
   });
 });
