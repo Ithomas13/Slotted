@@ -61,6 +61,35 @@ describe("aiOutputSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects scheduled items with non-ISO dates", () => {
+    const input = {
+      scheduled: [{ taskId: "task1", slotStart: "Monday at nine", slotEnd: "later" }],
+      skipped: [],
+    };
+    const result = aiOutputSchema.safeParse(input);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects scheduled items that end before they start", () => {
+    const input = {
+      scheduled: [
+        { taskId: "task1", slotStart: "2025-01-06T10:00:00.000Z", slotEnd: "2025-01-06T09:00:00.000Z" },
+      ],
+      skipped: [],
+    };
+    const result = aiOutputSchema.safeParse(input);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects skipped items with blank reasons", () => {
+    const input = {
+      scheduled: [],
+      skipped: [{ taskId: "task1", reason: "", suggestion: "Try tomorrow" }],
+    };
+    const result = aiOutputSchema.safeParse(input);
+    expect(result.success).toBe(false);
+  });
+
   it("parses JSON string via parseAIOutput helper", async () => {
     const { parseAIOutput } = await import("./schemas");
     const json = JSON.stringify({
