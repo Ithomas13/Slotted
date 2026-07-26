@@ -79,6 +79,25 @@ describe("computeFreeSlots", () => {
     });
   });
 
+  it("returns no slots for invalid or inverted ranges", () => {
+    expect(computeFreeSlots([], new Date("bad-date"), new Date(2025, 0, 7))).toEqual([]);
+    expect(computeFreeSlots([], new Date(2025, 0, 7), new Date(2025, 0, 6))).toEqual([]);
+  });
+
+  it("ignores invalid calendar events", () => {
+    const events: CalendarEvent[] = [
+      { id: "1", summary: "Bad", start: "not a date", end: day(6, 10), allDay: false },
+      { id: "2", summary: "Backwards", start: day(6, 12), end: day(6, 11), allDay: false },
+      { id: "3", summary: "Meeting", start: day(6, 9), end: day(6, 10), allDay: false },
+    ];
+
+    const slots = computeFreeSlots(events, new Date(2025, 0, 6), new Date(2025, 0, 7));
+
+    slots.forEach((s) => {
+      expect(new Date(s.end) <= new Date(day(6, 9)) || new Date(s.start) >= new Date(day(6, 10))).toBe(true);
+    });
+  });
+
   it("subtracts preserved manual slots from free slots", () => {
     const slots = subtractBusyIntervalsFromFreeSlots(
       [{ start: day(6, 9), end: day(6, 12), durationMins: 180 }],

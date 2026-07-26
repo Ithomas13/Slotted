@@ -62,9 +62,14 @@ function eventsToIntervals(events: CalendarEvent[]): Interval[] {
   for (const event of events) {
     if (event.allDay) {
       // Parse YYYY-MM-DD as local midnight to match how tests create Date objects
-      intervals.push({ start: parseDateLocal(event.start), end: parseDateLocal(event.end) });
+      const interval = toInterval({
+        start: parseDateLocal(event.start),
+        end: parseDateLocal(event.end),
+      });
+      if (interval) intervals.push(interval);
     } else {
-      intervals.push({ start: new Date(event.start), end: new Date(event.end) });
+      const interval = toInterval({ start: event.start, end: event.end });
+      if (interval) intervals.push(interval);
     }
   }
 
@@ -93,6 +98,14 @@ export function computeFreeSlots(
   rangeStart: Date,
   rangeEnd: Date
 ): FreeSlot[] {
+  if (
+    Number.isNaN(rangeStart.getTime()) ||
+    Number.isNaN(rangeEnd.getTime()) ||
+    rangeEnd <= rangeStart
+  ) {
+    return [];
+  }
+
   const eventIntervals = eventsToIntervals(events);
   const sleepBlocks = addSleepBlocks(rangeStart, rangeEnd);
   const allBlocked = mergeIntervals([...eventIntervals, ...sleepBlocks]);
