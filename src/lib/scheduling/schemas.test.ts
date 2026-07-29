@@ -90,6 +90,31 @@ describe("aiOutputSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects duplicate scheduled task ids", () => {
+    const input = {
+      scheduled: [
+        { taskId: "task1", slotStart: "2025-01-06T09:00:00.000Z", slotEnd: "2025-01-06T10:00:00.000Z" },
+        { taskId: "task1", slotStart: "2025-01-06T11:00:00.000Z", slotEnd: "2025-01-06T12:00:00.000Z" },
+      ],
+      skipped: [],
+    };
+
+    const result = aiOutputSchema.safeParse(input);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects tasks that are both scheduled and skipped", () => {
+    const input = {
+      scheduled: [
+        { taskId: "task1", slotStart: "2025-01-06T09:00:00.000Z", slotEnd: "2025-01-06T10:00:00.000Z" },
+      ],
+      skipped: [{ taskId: "task1", reason: "No room", suggestion: "Move later" }],
+    };
+
+    const result = aiOutputSchema.safeParse(input);
+    expect(result.success).toBe(false);
+  });
+
   it("parses JSON string via parseAIOutput helper", async () => {
     const { parseAIOutput } = await import("./schemas");
     const json = JSON.stringify({

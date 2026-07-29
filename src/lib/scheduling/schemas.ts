@@ -23,6 +23,30 @@ export const skippedItemSchema = z.object({
 export const aiOutputSchema = z.object({
   scheduled: z.array(scheduledItemSchema),
   skipped: z.array(skippedItemSchema),
+}).superRefine((output, ctx) => {
+  const seen = new Set<string>();
+
+  output.scheduled.forEach((item, index) => {
+    if (seen.has(item.taskId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "taskId must appear only once across scheduled and skipped items",
+        path: ["scheduled", index, "taskId"],
+      });
+    }
+    seen.add(item.taskId);
+  });
+
+  output.skipped.forEach((item, index) => {
+    if (seen.has(item.taskId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "taskId must appear only once across scheduled and skipped items",
+        path: ["skipped", index, "taskId"],
+      });
+    }
+    seen.add(item.taskId);
+  });
 });
 
 export type AIOutput = z.infer<typeof aiOutputSchema>;
