@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { assertOk, readJson } from "@/lib/api/client";
 import type { Note } from "@/types/index";
 import type { CreateNoteBody, UpdateNoteBody } from "@/types/api";
 
 async function fetchNotes(): Promise<Note[]> {
   const res = await fetch("/api/notes");
-  if (!res.ok) throw new Error("Failed to fetch notes");
-  return res.json();
+  return readJson<Note[]>(res, "Failed to fetch notes");
 }
 
 export function useNotes() {
@@ -21,8 +21,7 @@ export function useCreateNote() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to create note");
-      return res.json() as Promise<Note>;
+      return readJson<Note>(res, "Failed to create note");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
   });
@@ -37,8 +36,7 @@ export function useUpdateNote() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to update note");
-      return res.json() as Promise<Note>;
+      return readJson<Note>(res, "Failed to update note");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
   });
@@ -49,7 +47,7 @@ export function useDeleteNote() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/notes/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete note");
+      await assertOk(res, "Failed to delete note");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
   });

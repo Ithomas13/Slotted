@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { assertOk, readJson } from "@/lib/api/client";
 import type { Task } from "@/types/index";
 import type { CreateTaskBody, UpdateTaskBody } from "@/types/api";
 
@@ -11,8 +12,7 @@ export function useCreateTask(noteId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to create task");
-      return res.json() as Promise<Task>;
+      return readJson<Task>(res, "Failed to create task");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notes"] });
@@ -30,8 +30,7 @@ export function useUpdateTask() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to update task");
-      return res.json() as Promise<Task>;
+      return readJson<Task>(res, "Failed to update task");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notes"] });
@@ -45,7 +44,7 @@ export function useDeleteTask() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete task");
+      await assertOk(res, "Failed to delete task");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notes"] });

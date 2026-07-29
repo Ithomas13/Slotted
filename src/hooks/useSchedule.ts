@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { assertOk, readJson } from "@/lib/api/client";
 import type { ScheduledPlan } from "@/types/index";
 import type { UpdateSlotBody } from "@/types/api";
 import { startOfWeek } from "date-fns";
@@ -9,8 +10,7 @@ function getWeekStart(date: Date = new Date()): string {
 
 async function fetchSchedule(weekStart: string): Promise<ScheduledPlan | null> {
   const res = await fetch(`/api/schedule?weekStart=${encodeURIComponent(weekStart)}`);
-  if (!res.ok) throw new Error("Failed to fetch schedule");
-  return res.json();
+  return readJson<ScheduledPlan | null>(res, "Failed to fetch schedule");
 }
 
 export function useSchedule(weekStart?: string) {
@@ -32,8 +32,7 @@ export function useGenerateSchedule() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ weekStart }),
       });
-      if (!res.ok) throw new Error("Failed to generate schedule");
-      return res.json() as Promise<ScheduledPlan>;
+      return readJson<ScheduledPlan>(res, "Failed to generate schedule");
     },
     onSuccess: (_data, weekStart) => {
       qc.invalidateQueries({ queryKey: ["schedule", weekStart] });
@@ -50,8 +49,7 @@ export function useUpdateSlot() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to update slot");
-      return res.json();
+      return readJson(res, "Failed to update slot");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
   });
@@ -62,7 +60,7 @@ export function useDeleteSlot() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/schedule/slots/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete slot");
+      await assertOk(res, "Failed to delete slot");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
   });
