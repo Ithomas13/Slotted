@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
-
-const updateSlotSchema = z.object({
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
-  manuallyMoved: z.boolean().optional(),
-});
+import { resolveSlotUpdate, updateSlotSchema } from "@/lib/scheduling/slotUpdate";
 
 async function requireSlotOwnership(slotId: string, userEmail: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { email: userEmail } });
@@ -29,14 +23,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = updateSlotSchema.safeParse(await req.json());
   if (!body.success) return NextResponse.json({ error: body.error.issues }, { status: 400 });
+  const update = resolveSlotUpdate(body.data, ownership.slot);
+  if (!update) return NextResponse.json({ error: "endTime must be after startTime" }, { status: 400 });
 
   const updated = await prisma.scheduledSlot.update({
     where: { id },
-    data: {
-      ...(body.data.startTime && { startTime: new Date(body.data.startTime) }),
-      ...(body.data.endTime && { endTime: new Date(body.data.endTime) }),
-      ...(body.data.manuallyMoved !== undefined && { manuallyMoved: body.data.manuallyMoved }),
-    },
+    data: update,
     include: { task: true },
   });
 
