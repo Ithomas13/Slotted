@@ -2,20 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { z } from "zod";
-
-const updateTaskSchema = z.object({
-  name: z.string().min(1).optional(),
-  importance: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
-  durationMins: z.number().int().min(1).optional(),
-  timeWindows: z
-    .array(z.object({ start: z.string(), end: z.string(), label: z.string().optional() }))
-    .nullable()
-    .optional(),
-  repeatRule: z.enum(["NONE", "DAILY", "WEEKLY"]).optional(),
-  completed: z.boolean().optional(),
-  position: z.number().int().min(0).optional(),
-});
+import { updateTaskSchema } from "@/lib/tasks/validation";
 
 async function requireTaskOwnership(taskId: string, userEmail: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { email: userEmail } });

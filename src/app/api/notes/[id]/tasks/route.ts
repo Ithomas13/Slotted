@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
-
-const createTaskSchema = z.object({
-  name: z.string().min(1),
-  importance: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-  durationMins: z.number().int().min(1),
-  timeWindows: z
-    .array(z.object({ start: z.string(), end: z.string(), label: z.string().optional() }))
-    .optional(),
-  repeatRule: z.enum(["NONE", "DAILY", "WEEKLY"]).optional(),
-});
+import { createTaskSchema } from "@/lib/tasks/validation";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

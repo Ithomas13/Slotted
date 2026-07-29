@@ -2,21 +2,17 @@
 
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import type { z } from "zod";
 import { useCreateTask, useUpdateTask } from "@/hooks/useTasks";
+import { createTaskSchema } from "@/lib/tasks/validation";
 import type { Task } from "@/types/index";
 
-const taskSchema = z.object({
-  name: z.string().min(1, "Name required"),
-  importance: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-  durationMins: z.number().int().min(1),
-  repeatRule: z.enum(["NONE", "DAILY", "WEEKLY"]),
-  timeWindows: z.array(
-    z.object({ start: z.string(), end: z.string(), label: z.string().optional() })
-  ),
+const taskFormSchema = createTaskSchema.extend({
+  repeatRule: createTaskSchema.shape.repeatRule.unwrap(),
+  timeWindows: createTaskSchema.shape.timeWindows.unwrap(),
 });
 
-type TaskFormValues = z.infer<typeof taskSchema>;
+type TaskFormValues = z.infer<typeof taskFormSchema>;
 
 const DURATION_PRESETS = [15, 30, 60, 90, 120];
 
@@ -32,7 +28,7 @@ export function TaskForm({ noteId, existingTask, onSuccess, onCancel }: TaskForm
   const updateTask = useUpdateTask();
 
   const { register, handleSubmit, watch, setValue, control, formState: { errors } } = useForm<TaskFormValues>({
-    resolver: zodResolver(taskSchema),
+    resolver: zodResolver(taskFormSchema),
     defaultValues: existingTask
       ? {
           name: existingTask.name,
